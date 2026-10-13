@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Haul</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #15100c; font-family: system-ui, sans-serif; overscroll-behavior: none; }
+    body { touch-action: none; }
+    #stage { position: fixed; inset: 0; }
+    #stage canvas { display: block; width: 100%; height: 100%; }
+
+    #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+    #hudLevel { position: absolute; top: 16px; left: 20px; font-size: 22px; }
+    #hudRoom { position: absolute; top: 16px; right: 20px; font-size: 18px; color: #9ab; }
+    #hudHint { position: absolute; bottom: 16px; left: 20px; font-size: 13px; color: #aab; }
+    #hudCenter { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 34px; }
+    #downedHint { position: absolute; top: 40%; left: 50%; transform: translateX(-50%); font-size: 20px; color: #ffcc33; text-align: center; display: none; }
+
+    #crosshair { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 0 2px rgba(0,0,0,.9); }
+    #lockHint { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 20px; background: rgba(0,0,0,.35); pointer-events: none; }
+    #hpBarWrap { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); width: 220px; height: 12px; background: rgba(30,0,0,.6); border: 1px solid rgba(255,255,255,.25); border-radius: 6px; overflow: hidden; }
+    #hpFill { height: 100%; width: 100%; background: linear-gradient(90deg,#e65a5a,#3cc878); transition: width .15s linear; }
+
+    #minimap { position: absolute; bottom: 16px; right: 20px; width: 170px; height: 110px; background: rgba(15,12,9,.55); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; }
+
+    #lobby { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: #15100c; color: #eef; z-index: 20; padding: 16px; box-sizing: border-box; }
+    #lobby h1 { margin: 0 0 8px; font-size: 44px; letter-spacing: 1px; }
+    #lobby input, #lobby button { width: 260px; box-sizing: border-box; padding: 14px; font-size: 17px; border-radius: 8px; border: 1px solid #2a2e3a; background: #171a22; color: #eef; }
+    #lobby button { cursor: pointer; background: #3cc878; color: #06210f; border: 0; font-weight: 600; }
+    #lobby button.alt { background: #262b38; color: #eef; }
+    #code { text-align: center; text-transform: uppercase; letter-spacing: 6px; }
+    #lobby .or { color: #889; font-size: 14px; margin: 6px 0 2px; }
+    #err { color: #ff7a7a; min-height: 20px; margin: 4px 0 0; font-size: 14px; text-align: center; }
+
+    /* Touch controls: hidden unless the "touch" class is on <body> */
+    #controls { position: fixed; inset: 0; pointer-events: none; z-index: 10; display: none; }
+    body.touch #controls { display: block; }
+    .stickBase { position: absolute; bottom: max(28px, env(safe-area-inset-bottom)); width: 100px; height: 100px; border-radius: 50%; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.2); pointer-events: auto; touch-action: none; }
+    #moveBase { left: 24px; }
+    #aimBase { right: 24px; }
+    .stickKnob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(255,255,255,.35); transition: transform .05s linear; }
+    .actionBtn { position: absolute; width: 66px; height: 66px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); background: rgba(60,200,120,.35); color: #fff; font-weight: 700; font-size: 14px; pointer-events: auto; touch-action: none; bottom: max(140px, calc(env(safe-area-inset-bottom) + 140px)); }
+    #grabBtn { right: 110px; }
+    #throwBtn { right: 30px; background: rgba(230,90,90,.35); }
+    #viewBtn { width: 54px; height: 54px; font-size: 11px; left: 24px; bottom: max(150px, calc(env(safe-area-inset-bottom) + 150px)); background: rgba(255,255,255,.12); }
+
+    #shop { display: none; position: fixed; inset: 0; z-index: 15; background: rgba(6,7,10,.88); color: #eef; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; box-sizing: border-box; }
+    #shop h2 { margin: 0; }
+    #shopList { width: min(420px, 100%); display: flex; flex-direction: column; gap: 8px; }
+    .shopRow { display: flex; justify-content: space-between; align-items: center; background: #171a22; border: 1px solid #2a2e3a; border-radius: 8px; padding: 10px 14px; }
+    .shopRow small { color: #99a; }
+    .shopRow button { padding: 8px 14px; border-radius: 6px; border: 0; background: #3cc878; color: #06210f; font-weight: 700; cursor: pointer; }
+    .shopRow button:disabled { background: #444; color: #888; cursor: default; }
+    #shopTimer { color: #9ab; }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <div id="hud">
+    <div id="hudLevel"></div>
+    <div id="hudRoom"></div>
+    <div id="hudHint">WASD move | Mouse look | E grab/drop | V third person | Click or Space throw | Stand by a downed teammate to revive</div>
+    <div id="hudCenter"></div>
+    <div id="downedHint">DOWNED — a teammate must stand near you to revive you</div>
+    <div id="crosshair"></div>
+    <div id="lockHint">Click to look around</div>
+    <div id="hpBarWrap"><div id="hpFill"></div></div>
+    <canvas id="minimap" width="170" height="110"></canvas>
+  </div>
+
+  <div id="controls">
+    <div id="moveBase" class="stickBase"><div id="moveKnob" class="stickKnob"></div></div>
+    <div id="aimBase" class="stickBase"><div id="aimKnob" class="stickKnob"></div></div>
+    <button id="grabBtn" class="actionBtn">GRAB</button>
+    <button id="throwBtn" class="actionBtn">THROW</button>
+    <button id="viewBtn" class="actionBtn">VIEW</button>
+  </div>
+
+  <div id="shop">
+    <h2>Shop</h2>
+    <div id="shopCredits" style="font-size:28px">$0</div>
+    <div id="shopList"></div>
+    <div id="shopTimer">Next level soon</div>
+  </div>
+
+  <div id="lobby">
+    <h1>Haul</h1>
+    <input id="name" maxlength="12" placeholder="Your name" autocomplete="off">
+    <button id="create">Create room</button>
+    <div class="or">or join a friend's room</div>
+    <input id="code" maxlength="4" placeholder="CODE" autocomplete="off">
+    <button id="join" class="alt">Join room</button>
+    <p id="err"></p>
+  </div>
+  <script src="client.js"></script>
+</body>
+</html>

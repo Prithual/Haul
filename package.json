@@ -7,8 +7,7 @@
     "build": "esbuild client/client.ts --bundle --minify --outfile=public/client.js",
     "start": "tsx src/server.ts",
     "dev": "npm run build:client && tsx src/server.ts",
-    "typecheck": "tsc --noEmit",
-    "check:maps": "tsx scripts/check-maps.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "ws": "^8.18.0",
